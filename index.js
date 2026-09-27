@@ -150,7 +150,7 @@ client.on('interactionCreate', async interaction => {
         // ⛔ YÖNETİCİ KONTROLÜ: /sunucubilgi HARİÇ TÜM KOMUTLARI KİLİTLER
         if (commandName !== 'sunucubilgi' && !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return interaction.reply({ 
-                content: '❌ **YETKİSİZ ERİŞİM:** Bu komutu veya yönetici rollerini kullanmak için `Yönetici` yetkisine sahip olmalısınız!', 
+                content: '❌ **YETKİSİZ ERİŞİM:** Bu komutu kullanmak için `Yönetici` yetkisine sahip olmalısınız!', 
                 flags: MessageFlags.Ephemeral 
             });
         }
