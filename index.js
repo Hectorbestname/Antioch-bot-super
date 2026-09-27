@@ -30,7 +30,7 @@ const client = new Client({
     ]
 });
 
-// Veri depolama (RAM üzerinde)
+// Depolama Alanları
 const otoRolAyarlari = new Map();
 const cekilisler = new Map();
 const oylamalar = new Map();
@@ -97,7 +97,7 @@ const commands = [
         .addStringOption(opt => opt.setName('id').setDescription('Yasaklaması kaldırılacak kullanıcının ID adresi').setRequired(true))
 ].map(command => command.toJSON());
 
-// BOT HAZIR OLDUĞUNDA
+// BOT HAZIR
 client.once('clientReady', async () => {
     console.log(`🛡️ [SİSTEM AKTİF]: ${client.user.tag} göreve başladı!`);
     client.user.setActivity('🏰 Sunucu Yönetimi', { type: ActivityType.Watching });
@@ -105,24 +105,24 @@ client.once('clientReady', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try { 
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands }); 
-        console.log('✅ [KOMUTLAR]: Tüm slash komutları başarıyla kaydedildi.'); 
+        console.log('✅ [KOMUTLAR]: Tüm slash komutları kaydedildi.'); 
     } catch (error) { 
         console.error('❌ [KOMUT HATASI]:', error); 
     }
 });
 
-// OTO ROL SİSTEMİ
+// OTO ROL
 client.on('guildMemberAdd', async member => {
     const otoRolId = otoRolAyarlari.get(member.guild.id);
     if (otoRolId) {
         const rol = member.guild.roles.cache.get(otoRolId);
         if (rol) {
-            await member.roles.add(rol).catch(err => console.error('Oto rol verme hatası:', err));
+            await member.roles.add(rol).catch(err => console.error('Oto rol hatası:', err));
         }
     }
 });
 
-// SA-AS SİSTEMİ
+// SA-AS
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
     const icerik = message.content.toLowerCase().trim();
@@ -131,28 +131,25 @@ client.on('messageCreate', async message => {
     }
 });
 
-// KOMUT İŞLEYİCİ
+// INTERACTION HANDLER
 client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
 
-        // Yetki Kontrolü (/sunucubilgi hariç hepsi için Yönetici yetkisi gerekir)
         if (commandName !== 'sunucubilgi' && !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-            return interaction.reply({ content: '❌ Bu komutu kullanmak için `Yönetici` yetkisine sahip olmalısınız.', flags: MessageFlags.Ephemeral });
+            return interaction.reply({ content: '❌ Bu komut için `Yönetici` yetkisi gereklidir.', flags: MessageFlags.Ephemeral });
         }
 
-        // /yaz
         if (commandName === 'yaz') {
             const mesaj = interaction.options.getString('mesaj');
             const hedefKanal = interaction.options.getChannel('kanal') || interaction.channel;
             try {
                 await hedefKanal.send({ content: mesaj });
                 await interaction.reply({ content: `✅ Mesaj ${hedefKanal} kanalına gönderildi.`, flags: MessageFlags.Ephemeral });
-            } catch (err) {
+            } catch {
                 await interaction.reply({ content: '❌ Mesaj gönderilemedi.', flags: MessageFlags.Ephemeral });
             }
         }
-        // /duyuru-dm
         else if (commandName === 'duyuru-dm') {
             const duyuruMetni = interaction.options.getString('mesaj');
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -175,15 +172,14 @@ client.on('interactionCreate', async interaction => {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 } catch { basarisiz++; }
             }
-            await interaction.editReply({ content: `✅ **DM Duyurusu Tamamlandı!**\n🟢 Başarılı: \`${basarili}\` | 🔴 Başarısız (DM Kapalı): \`${basarisiz}\`` });
+            await interaction.editReply({ content: `✅ **DM Duyuru Tamamlandı!**\n🟢 Başarılı: \`${basarili}\` | 🔴 Başarısız: \`${basarisiz}\`` });
         }
-        // /dogrulama-kur
         else if (commandName === 'dogrulama-kur') {
             const verilecekRol = interaction.options.getRole('rol');
             const embed = new EmbedBuilder()
                 .setColor('#2ECC71')
                 .setTitle('🛡️ **KULLANICI DOĞRULAMA**')
-                .setDescription('Sunucuya tam erişim sağlamak için aşağıdaki **"✅ Doğrula"** butonuna tıklayınız.')
+                .setDescription('Sunucuya erişmek için aşağıdaki **"✅ Doğrula"** butonuna tıklayınız.')
                 .setTimestamp();
 
             const row = new ActionRowBuilder().addComponents(
@@ -191,15 +187,13 @@ client.on('interactionCreate', async interaction => {
             );
 
             await interaction.channel.send({ embeds: [embed], components: [row] });
-            await interaction.reply({ content: `✅ Doğrulama paneli kuruldu. Verilecek Rol: <@&${verilecekRol.id}>`, flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: `✅ Panel kuruldu. Rol: <@&${verilecekRol.id}>`, flags: MessageFlags.Ephemeral });
         }
-        // /oto-rol
         else if (commandName === 'oto-rol') {
             const rol = interaction.options.getRole('rol');
             otoRolAyarlari.set(interaction.guild.id, rol.id);
-            await interaction.reply({ content: `✅ Oto rol sistemi aktifleştirildi. Yeni gelenlere verilecek rol: <@&${rol.id}>`, flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: `✅ Oto rol ayarlandı: <@&${rol.id}>`, flags: MessageFlags.Ephemeral });
         }
-        // /sunucubilgi
         else if (commandName === 'sunucubilgi') {
             const guild = interaction.guild;
             const embed = new EmbedBuilder()
@@ -212,50 +206,45 @@ client.on('interactionCreate', async interaction => {
                 ).setTimestamp();
             await interaction.reply({ embeds: [embed] });
         }
-        // /sil
         else if (commandName === 'sil') {
             const sayi = interaction.options.getInteger('sayi');
-            if (sayi < 1 || sayi > 100) return interaction.reply({ content: '❌ Lütfen 1 ile 100 arasında bir sayı girin.', flags: MessageFlags.Ephemeral });
+            if (sayi < 1 || sayi > 100) return interaction.reply({ content: '❌ Lütfen 1-100 arasında bir sayı girin.', flags: MessageFlags.Ephemeral });
 
             const deleted = await interaction.channel.bulkDelete(sayi, true).catch(() => null);
-            if (!deleted) return interaction.reply({ content: '❌ Mesajlar silinemedi (14 günden eski mesajlar toplu silinemez).', flags: MessageFlags.Ephemeral });
+            if (!deleted) return interaction.reply({ content: '❌ Mesajlar silinemedi.', flags: MessageFlags.Ephemeral });
 
-            await interaction.reply({ content: `🧹 **${deleted.size}** adet mesaj başarıyla silindi.`, flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: `🧹 **${deleted.size}** mesaj silindi.`, flags: MessageFlags.Ephemeral });
         }
-        // /kick
         else if (commandName === 'kick') {
             const user = interaction.options.getUser('kullanici');
             const sebep = interaction.options.getString('sebep') || 'Sebep belirtilmedi.';
             const member = await interaction.guild.members.fetch(user.id).catch(() => null);
 
             if (!member) return interaction.reply({ content: '❌ Kullanıcı bulunamadı.', flags: MessageFlags.Ephemeral });
-            if (!member.kickable) return interaction.reply({ content: '❌ Bu kullanıcıyı atmak için yetkim yetersiz.', flags: MessageFlags.Ephemeral });
+            if (!member.kickable) return interaction.reply({ content: '❌ Yetkim yetersiz.', flags: MessageFlags.Ephemeral });
 
             await member.kick(sebep);
-            await interaction.reply({ content: `🦶 **${user.tag}** sunucudan atıldı. Sebep: \`${sebep}\`` });
+            await interaction.reply({ content: `🦶 **${user.tag}** atıldı. Sebep: \`${sebep}\`` });
         }
-        // /ban
         else if (commandName === 'ban') {
             const user = interaction.options.getUser('kullanici');
             const sebep = interaction.options.getString('sebep') || 'Sebep belirtilmedi.';
             const member = await interaction.guild.members.fetch(user.id).catch(() => null);
 
-            if (member && !member.bannable) return interaction.reply({ content: '❌ Bu kullanıcıyı yasaklamak için yetkim yetersiz.', flags: MessageFlags.Ephemeral });
+            if (member && !member.bannable) return interaction.reply({ content: '❌ Yetkim yetersiz.', flags: MessageFlags.Ephemeral });
 
             await interaction.guild.members.ban(user.id, { reason: sebep });
-            await interaction.reply({ content: `🔨 **${user.tag}** sunucudan yasaklandı. Sebep: \`${sebep}\`` });
+            await interaction.reply({ content: `🔨 **${user.tag}** yasaklandı. Sebep: \`${sebep}\`` });
         }
-        // /unban
         else if (commandName === 'unban') {
             const userId = interaction.options.getString('id');
             try {
                 await interaction.guild.members.unban(userId);
-                await interaction.reply({ content: `🔓 \`${userId}\` ID'li kullanıcının yasaklaması kaldırıldı.` });
+                await interaction.reply({ content: `🔓 \`${userId}\` ID'li kullanıcının yasağı kaldırıldı.` });
             } catch {
-                await interaction.reply({ content: '❌ Yasaklama kaldırılamadı. Geçerli bir ID girdiğinizden ve kullanıcının yasaklı olduğundan emin olun.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: '❌ Yasaklama kaldırılamadı.', flags: MessageFlags.Ephemeral });
             }
         }
-        // /cekilis
         else if (commandName === 'cekilis') {
             const odul = interaction.options.getString('odul');
             const sureDakika = interaction.options.getInteger('sure');
@@ -289,7 +278,6 @@ client.on('interactionCreate', async interaction => {
                 cekilisler.delete(mesaj.id);
             }, sureDakika * 60 * 1000);
         }
-        // /oylama
         else if (commandName === 'oylama') {
             const soru = interaction.options.getString('soru');
             const sureDakika = interaction.options.getInteger('sure');
@@ -321,7 +309,6 @@ client.on('interactionCreate', async interaction => {
             }, sureDakika * 60 * 1000);
         }
     }
-    // BUTON ETKİLEŞİMLERİ
     else if (interaction.isButton()) {
         const { customId, guild, member, user, message } = interaction;
 
@@ -332,11 +319,11 @@ client.on('interactionCreate', async interaction => {
             if (member.roles.cache.has(rol.id)) return interaction.reply({ content: 'ℹ️ Zaten bu role sahipsiniz.', flags: MessageFlags.Ephemeral });
 
             await member.roles.add(rol);
-            await interaction.reply({ content: `🎉 <@&${rol.id}> rolü başarıyla verildi!`, flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: `🎉 <@&${rol.id}> rolü verildi!`, flags: MessageFlags.Ephemeral });
         }
         else if (customId === 'cekilis_katil') {
             const veri = cekilisler.get(message.id);
-            if (!veri) return interaction.reply({ content: '❌ Çekiliş sona ermiş.', flags: MessageFlags.Ephemeral });
+            if (!veri) return interaction.reply({ content: '❌ Çekiliş bitti.', flags: MessageFlags.Ephemeral });
 
             if (veri.katilanlar.has(user.id)) {
                 veri.katilanlar.delete(user.id);
@@ -352,12 +339,12 @@ client.on('interactionCreate', async interaction => {
         }
         else if (customId === 'oy_evet' || customId === 'oy_hayir') {
             const veri = oylamalar.get(message.id);
-            if (!veri) return interaction.reply({ content: '❌ Oylama sona ermiş.', flags: MessageFlags.Ephemeral });
+            if (!veri) return interaction.reply({ content: '❌ Oylama bitti.', flags: MessageFlags.Ephemeral });
 
             if (customId === 'oy_evet') { veri.hayir.delete(user.id); veri.evet.add(user.id); }
             else { veri.evet.delete(user.id); veri.hayir.add(user.id); }
 
-            await interaction.reply({ content: '✅ Oyunuz başarıyla kaydedildi!', flags: MessageFlags.Ephemeral });
+            await interaction.reply({ content: '✅ Oyunuz kaydedildi!', flags: MessageFlags.Ephemeral });
 
             const embed = EmbedBuilder.from(message.embeds[0])
                 .setDescription(`📌 **Soru:** ${veri.soru}\n\n✅ **Evet:** \`${veri.evet.size}\` | ❌ **Hayır:** \`${veri.hayir.size}\``);
