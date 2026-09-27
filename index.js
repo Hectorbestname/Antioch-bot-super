@@ -30,12 +30,13 @@ const client = new Client({
 const otoRolAyarlari = new Map();
 const ticketYetkiliRolleri = new Map();
 
-// SLASH KOMUTLARI LİSTESİ
+// SLASH KOMUTLARI LİSTESİ (SADECE YÖNETİCİYE ÖZEL İZİNLER EKLENDİ)
 const commands = [
     // 1. Botun Mesaj Göndermesi Komutu
     new SlashCommandBuilder()
         .setName('yaz')
         .setDescription('🤖 Belirttiğiniz mesajı bot adıyla kanala gönderir.')
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addStringOption(opt => opt.setName('mesaj').setDescription('Gönderilecek mesaj metni').setRequired(true))
         .addChannelOption(opt => opt.setName('kanal').setDescription('Mesajın atılacağı kanal (Opsiyonel)').setRequired(false)),
 
@@ -43,12 +44,14 @@ const commands = [
     new SlashCommandBuilder()
         .setName('duyuru-dm')
         .setDescription('📢 Sunucudaki TÜM ÜYELERE özel mesaj (DM) olarak duyuru gönderir.')
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addStringOption(opt => opt.setName('mesaj').setDescription('DM ile gönderilecek duyuru metni').setRequired(true)),
 
     // 3. Doğrulama (Verify) Paneli Kurma Komutu
     new SlashCommandBuilder()
         .setName('verify-kur')
         .setDescription('✅ Butonlu kullanıcı doğrulama panelini kurar.')
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addRoleOption(opt => opt.setName('verilecek-rol').setDescription('Doğrulanan üyelere verilecek rol').setRequired(true))
         .addRoleOption(opt => opt.setName('alinacak-rol').setDescription('Doğrulanan üyeden ALINACAK rol (örn: Kayıtsız/Unverified)').setRequired(false)),
 
@@ -56,9 +59,10 @@ const commands = [
     new SlashCommandBuilder()
         .setName('otorol-ayarla')
         .setDescription('🤖 Sunucuya yeni katılan üyelere otomatik verilecek rolü ayarlar.')
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addRoleOption(opt => opt.setName('rol').setDescription('Otomatik verilecek rol').setRequired(true)),
 
-    // 5. Sunucu Bilgi Komutu (HERKES KULLANABİLİR)
+    // 5. Sunucu Bilgi Komutu (HERKES KULLANABİLİR - KISITLAMA YOK)
     new SlashCommandBuilder()
         .setName('sunucubilgi')
         .setDescription('🏰 Sunucu hakkındaki istatistikleri ve detaylı bilgileri gösterir.'),
@@ -67,18 +71,21 @@ const commands = [
     new SlashCommandBuilder()
         .setName('kanal-kilitle')
         .setDescription('🔒 Bulunduğunuz kanalı üyelerin mesaj yazmasına kapatır.')
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addChannelOption(opt => opt.setName('kanal').setDescription('Kilitlenecek kanal (Opsiyonel)').setRequired(false)),
 
     // 🔓 7. Kanal Kilidi Açma Komutu
     new SlashCommandBuilder()
         .setName('kanal-ac')
         .setDescription('🔓 Kilitli olan kanalın kilidini açarak tekrar mesaja açar.')
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addChannelOption(opt => opt.setName('kanal').setDescription('Açılacak kanal (Opsiyonel)').setRequired(false)),
 
     // 🎭 8. Rol Verme Komutu
     new SlashCommandBuilder()
         .setName('rol-ver')
         .setDescription('🎭 Belirtilen kullanıcıya istediğiniz rolü verir.')
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addUserOption(opt => opt.setName('kullanici').setDescription('Rol verilecek üye').setRequired(true))
         .addRoleOption(opt => opt.setName('rol').setDescription('Verilecek rol').setRequired(true)),
 
@@ -86,6 +93,7 @@ const commands = [
     new SlashCommandBuilder()
         .setName('figuranticket')
         .setDescription('🎫 Görseldeki gibi butonlu Destek Talebi (Ticket) panelini kurar.')
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addRoleOption(opt => opt.setName('yetkili-rol').setDescription('Talepleri görebilecek yetkili/destek ekibi rolü').setRequired(false))
 ].map(command => command.toJSON());
 
@@ -96,7 +104,7 @@ client.once('clientReady', async () => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try { 
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands }); 
-        console.log('✅ [KOMUTLAR]: Slash komutları kaydedildi.'); 
+        console.log('✅ [KOMUTLAR]: Slash komutları kaydedildi ve yetkiler güncellendi.'); 
     } catch (error) { 
         console.error('❌ [KOMUT HATASI]:', error); 
     }
@@ -131,7 +139,7 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
 
-        // ⛔ SADECE YÖNETİCİ KONTROLÜ (/sunucubilgi HARİÇ)
+        // ⛔ İKİNCİ KONTROL: YÖNETİCİ KONTROLÜ (/sunucubilgi HARİÇ)
         if (commandName !== 'sunucubilgi' && !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return interaction.reply({ 
                 content: '❌ **YETKİSİZ ERİŞİM:** Bu komutu kullanmak için `Yönetici` yetkisine sahip olmalısınız!', 
@@ -361,7 +369,7 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // 🎫 TICKET OLUŞTURMA BUTONLARI
+        // 🎫 TICKET OLUŞTURMA BUTONLARI (HER KULLANICI TIKLAYABİLİR)
         else if (customId.startsWith('ticket_') && customId !== 'ticket_kapat') {
             const kuralTipi = customId.replace('ticket_', '');
             
