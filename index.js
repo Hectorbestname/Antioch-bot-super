@@ -9,7 +9,7 @@ process.on('unhandledRejection', error => {
 // Render / Replit vb. platformlarda botun 7/24 açık kalması için web sunucu
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('MESAJ, DUYURU, VERIFY, OTOROL, SUNUCUBILGI, CEKILIS, OYLAMA, KANAL/ROL VE TICKET BOTU AKTIF!\n');
+    res.end('BOT AKTIF!\n');
 });
 
 const PORT = process.env.PORT || 3000;
@@ -28,8 +28,6 @@ const client = new Client({
 
 // Sistem verilerini hafızada tutan Haritalar
 const otoRolAyarlari = new Map();
-const cekilisler = new Map();
-const oylamalar = new Map();
 const ticketYetkiliRolleri = new Map();
 
 // SLASH KOMUTLARI LİSTESİ
@@ -65,40 +63,26 @@ const commands = [
         .setName('sunucubilgi')
         .setDescription('🏰 Sunucu hakkındaki istatistikleri ve detaylı bilgileri gösterir.'),
 
-    // 6. Çekiliş Komutu
-    new SlashCommandBuilder()
-        .setName('cekilis')
-        .setDescription('🎁 Zamanlayıcılı canlı çekiliş başlatır.')
-        .addStringOption(opt => opt.setName('odul').setDescription('Çekiliş ödülü').setRequired(true))
-        .addIntegerOption(opt => opt.setName('sure').setDescription('Çekiliş süresi (Dakika)').setRequired(true)),
-
-    // 7. Oylama Komutu
-    new SlashCommandBuilder()
-        .setName('oylama')
-        .setDescription('📊 Butonlu canlı oylama başlatır.')
-        .addStringOption(opt => opt.setName('soru').setDescription('Oylama sorusu/konusu').setRequired(true))
-        .addIntegerOption(opt => opt.setName('sure').setDescription('Oylama süresi (Dakika)').setRequired(true)),
-
-    // 🔒 8. Kanal Kilitleme Komutu
+    // 🔒 6. Kanal Kilitleme Komutu
     new SlashCommandBuilder()
         .setName('kanal-kilitle')
         .setDescription('🔒 Bulunduğunuz kanalı üyelerin mesaj yazmasına kapatır.')
         .addChannelOption(opt => opt.setName('kanal').setDescription('Kilitlenecek kanal (Opsiyonel)').setRequired(false)),
 
-    // 🔓 9. Kanal Kilidi Açma Komutu
+    // 🔓 7. Kanal Kilidi Açma Komutu
     new SlashCommandBuilder()
         .setName('kanal-ac')
         .setDescription('🔓 Kilitli olan kanalın kilidini açarak tekrar mesaja açar.')
         .addChannelOption(opt => opt.setName('kanal').setDescription('Açılacak kanal (Opsiyonel)').setRequired(false)),
 
-    // 🎭 10. Rol Verme Komutu
+    // 🎭 8. Rol Verme Komutu
     new SlashCommandBuilder()
         .setName('rol-ver')
         .setDescription('🎭 Belirtilen kullanıcıya istediğiniz rolü verir.')
         .addUserOption(opt => opt.setName('kullanici').setDescription('Rol verilecek üye').setRequired(true))
         .addRoleOption(opt => opt.setName('rol').setDescription('Verilecek rol').setRequired(true)),
 
-    // 🎫 11. Figüran / Destek Talebi Paneli Komutu
+    // 🎫 9. Figüran / Destek Talebi Paneli Komutu
     new SlashCommandBuilder()
         .setName('figuranticket')
         .setDescription('🎫 Görseldeki gibi butonlu Destek Talebi (Ticket) panelini kurar.')
@@ -147,7 +131,7 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
 
-        // ⛔ YÖNETİCİ KONTROLÜ: /sunucubilgi HARİÇ TÜM KOMUTLARI KİLİTLER
+        // ⛔ SADECE YÖNETİCİ KONTROLÜ (/sunucubilgi HARİÇ)
         if (commandName !== 'sunucubilgi' && !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return interaction.reply({ 
                 content: '❌ **YETKİSİZ ERİŞİM:** Bu komutu kullanmak için `Yönetici` yetkisine sahip olmalısınız!', 
@@ -266,106 +250,7 @@ client.on('interactionCreate', async interaction => {
             await interaction.reply({ embeds: [embed] });
         }
 
-        // 🎁 6. ÇEKİLİŞ START (/cekilis)
-        else if (commandName === 'cekilis') {
-            const odul = interaction.options.getString('odul');
-            const sureDakika = interaction.options.getInteger('sure');
-
-            const bitisZamani = Math.floor((Date.now() + sureDakika * 60 * 1000) / 1000);
-
-            const embed = new EmbedBuilder()
-                .setColor('#F1C40F')
-                .setTitle('🎉 **ÇEKİLİŞ BAŞLADI** 🎉')
-                .setDescription(`🏆 **Ödül:** \`${odul}\`\n⏰ **Bitiş Süresi:** <t:${bitisZamani}:R>\n👤 **Düzenleyen:** <@${interaction.user.id}>`)
-                .setFooter({ text: 'Çekilişe katılmak için aşağıdaki butona basın!' })
-                .setTimestamp();
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('cekilis_katil')
-                    .setLabel('Çekilişe Katıl (0)')
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('🎁')
-            );
-
-            await interaction.reply({ content: '✅ Çekiliş başarıyla başlatıldı!', flags: MessageFlags.Ephemeral });
-            const mesaj = await interaction.channel.send({ embeds: [embed], components: [row] });
-
-            cekilisler.set(mesaj.id, {
-                katilanlar: new Set(),
-                odul: odul
-            });
-
-            setTimeout(async () => {
-                const veriler = cekilisler.get(mesaj.id);
-                if (!veriler) return;
-
-                const katilanDizisi = Array.from(veriler.katilanlar);
-                let kazananMetni = 'Yeterli katılım olmadığı için kazanan seçilemedi.';
-
-                if (katilanDizisi.length > 0) {
-                    const rastgeleKazanan = katilanDizisi[Math.floor(Math.random() * katilanDizisi.length)];
-                    kazananMetni = `<@${rastgeleKazanan}>`;
-                }
-
-                const bitisEmbed = new EmbedBuilder()
-                    .setColor('#E74C3C')
-                    .setTitle('🎉 **ÇEKİLİŞ BİTTİ** 🎉')
-                    .setDescription(`🏆 **Ödül:** \`${veriler.odul}\`\n👑 **Kazanan:** ${kazananMetni}\n👥 **Toplam Katılımcı:** \`${katilanDizisi.length}\``)
-                    .setTimestamp();
-
-                await mesaj.edit({ embeds: [bitisEmbed], components: [] }).catch(() => {});
-                if (katilanDizisi.length > 0) {
-                    await mesaj.reply({ content: `🎉 Tebrikler ${kazananMetni}! **${veriler.odul}** ödülünü kazandınız!` });
-                }
-                cekilisler.delete(mesaj.id);
-            }, sureDakika * 60 * 1000);
-        }
-
-        // 📊 7. OYLAMA START (/oylama)
-        else if (commandName === 'oylama') {
-            const soru = interaction.options.getString('soru');
-            const sureDakika = interaction.options.getInteger('sure');
-
-            const bitisZamani = Math.floor((Date.now() + sureDakika * 60 * 1000) / 1000);
-
-            const embed = new EmbedBuilder()
-                .setColor('#3498DB')
-                .setTitle('📊 **CANLI OYLAMA**')
-                .setDescription(`📌 **Soru:** ${soru}\n⏰ **Bitiş:** <t:${bitisZamani}:R>\n\n✅ **Evet:** \`0\`\n❌ **Hayır:** \`0\``)
-                .setFooter({ text: 'Oyunuzu kullanmak için aşağıdaki butonlara basın!' })
-                .setTimestamp();
-
-            const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('oy_evet').setLabel('Evet (0)').setStyle(ButtonStyle.Success).setEmoji('✅'),
-                new ButtonBuilder().setCustomId('oy_hayir').setLabel('Hayır (0)').setStyle(ButtonStyle.Danger).setEmoji('❌')
-            );
-
-            await interaction.reply({ content: '✅ Oylama başlatıldı!', flags: MessageFlags.Ephemeral });
-            const mesaj = await interaction.channel.send({ embeds: [embed], components: [row] });
-
-            oylamalar.set(mesaj.id, {
-                soru: soru,
-                evet: new Set(),
-                hayir: new Set()
-            });
-
-            setTimeout(async () => {
-                const veri = oylamalar.get(mesaj.id);
-                if (!veri) return;
-
-                const bitisEmbed = new EmbedBuilder()
-                    .setColor('#2ECC71')
-                    .setTitle('📊 **OYLAMA TAMAMLANDI**')
-                    .setDescription(`📌 **Soru:** ${veri.soru}\n\n✅ **Evet:** \`${veri.evet.size}\` Oy\n❌ **Hayır:** \`${veri.hayir.size}\` Oy`)
-                    .setTimestamp();
-
-                await mesaj.edit({ embeds: [bitisEmbed], components: [] }).catch(() => {});
-                oylamalar.delete(mesaj.id);
-            }, sureDakika * 60 * 1000);
-        }
-
-        // 🔒 8. KANAL KİLİTLEME (/kanal-kilitle)
+        // 🔒 6. KANAL KİLİTLEME (/kanal-kilitle)
         else if (commandName === 'kanal-kilitle') {
             const hedefKanal = interaction.options.getChannel('kanal') || interaction.channel;
             try {
@@ -376,7 +261,7 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // 🔓 9. KANAL KİLİDİ AÇMA (/kanal-ac)
+        // 🔓 7. KANAL KİLİDİ AÇMA (/kanal-ac)
         else if (commandName === 'kanal-ac') {
             const hedefKanal = interaction.options.getChannel('kanal') || interaction.channel;
             try {
@@ -387,7 +272,7 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // 🎭 10. ROL VERME (/rol-ver)
+        // 🎭 8. ROL VERME (/rol-ver)
         else if (commandName === 'rol-ver') {
             const hedefUye = interaction.options.getUser('kullanici');
             const verilecekRol = interaction.options.getRole('rol');
@@ -409,7 +294,7 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // 🎫 11. FİGÜRAN / DESTEK TALEBİ PANELİ (/figuranticket)
+        // 🎫 9. FİGÜRAN / DESTEK TALEBİ PANELİ (/figuranticket)
         else if (commandName === 'figuranticket') {
             const yetkiliRol = interaction.options.getRole('yetkili-rol');
             if (yetkiliRol) {
@@ -442,7 +327,7 @@ client.on('interactionCreate', async interaction => {
 
     // --- BUTON ETKİLEŞİMLERİ ---
     else if (interaction.isButton()) {
-        const { customId, guild, member, user, message } = interaction;
+        const { customId, guild, member, user } = interaction;
 
         // ✅ VERIFY BUTONU
         if (customId.startsWith('verify_button_')) {
@@ -487,7 +372,9 @@ client.on('interactionCreate', async interaction => {
                 'destek': 'destek'
             };
 
-            const kanalAdi = `${tipIsimleri[kuralTipi] \vert{}\vert{} 'destek'}-${user.username.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+            const secilenTip = tipIsimleri[kuralTipi] ? tipIsimleri[kuralTipi] : 'destek';
+            const temizKullaniciAdi = user.username.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const kanalAdi = secilenTip + '-' + temizKullaniciAdi;
 
             const varKanal = guild.channels.cache.find(c => c.name === kanalAdi);
             if (varKanal) {
@@ -529,7 +416,7 @@ client.on('interactionCreate', async interaction => {
                 const ticketEmbed = new EmbedBuilder()
                     .setColor('#2ECC71')
                     .setTitle('🎫 **DESTEK TALEBİ OLUŞTURULDU**')
-                    .setDescription(`Merhaba <@${user.id}>,\n\n**Talep Türü:** \`${tipIsimleri[kuralTipi].toUpperCase()}\`\n\nYetkililerimiz en kısa sürede seninle ilgilenecektir. Lütfen sorununuzu veya başvurunuzu detaylıca açıklayınız.\n\nTalebi kapatmak için aşağıdaki **"🔒 Talebi Kapat"** butonuna basabilirsiniz.`)
+                    .setDescription(`Merhaba <@${user.id}>,\n\n**Talep Türü:** \`${secilenTip.toUpperCase()}\`\n\nYetkililerimiz en kısa sürede seninle ilgilenecektir. Lütfen sorununuzu veya başvurunuzu detaylıca açıklayınız.\n\nTalebi kapatmak için aşağıdaki **"🔒 Talebi Kapat"** butonuna basabilirsiniz.`)
                     .setTimestamp();
 
                 const ticketRow = new ActionRowBuilder().addComponents(
@@ -555,56 +442,6 @@ client.on('interactionCreate', async interaction => {
             setTimeout(async () => {
                 await interaction.channel.delete().catch(() => {});
             }, 5000);
-        }
-
-        // 🎁 ÇEKİLİŞ BUTONU
-        else if (customId === 'cekilis_katil') {
-            const veri = cekilisler.get(message.id);
-            if (!veri) return interaction.reply({ content: '❌ Çekiliş süresi doldu.', flags: MessageFlags.Ephemeral });
-
-            if (veri.katilanlar.has(user.id)) {
-                veri.katilanlar.delete(user.id);
-                await interaction.reply({ content: '❌ Çekilişten ayrıldınız.', flags: MessageFlags.Ephemeral });
-            } else {
-                veri.katilanlar.add(user.id);
-                await interaction.reply({ content: '🎉 Çekilişe katıldınız!', flags: MessageFlags.Ephemeral });
-            }
-
-            const guncelRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('cekilis_katil')
-                    .setLabel(`Çekilişe Katıl (${veri.katilanlar.size})`)
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji('🎁')
-            );
-
-            await message.edit({ components: [guncelRow] }).catch(() => {});
-        }
-
-        // 📊 OYLAMA BUTONLARI (EVET / HAYIR)
-        else if (customId === 'oy_evet' || customId === 'oy_hayir') {
-            const veri = oylamalar.get(message.id);
-            if (!veri) return interaction.reply({ content: '❌ Oylama süresi doldu.', flags: MessageFlags.Ephemeral });
-
-            if (customId === 'oy_evet') {
-                veri.hayir.delete(user.id);
-                veri.evet.add(user.id);
-            } else {
-                veri.evet.delete(user.id);
-                veri.hayir.add(user.id);
-            }
-
-            await interaction.reply({ content: '✅ Oyunuz kaydedildi!', flags: MessageFlags.Ephemeral });
-
-            const guncelEmbed = EmbedBuilder.from(message.embeds[0])
-                .setDescription(`📌 **Soru:** ${veri.soru}\n⏰ **Oylama Devam Ediyor...**\n\n✅ **Evet:** \`${veri.evet.size}\`\n❌ **Hayır:** \`${veri.hayir.size}\``);
-
-            const guncelRow = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('oy_evet').setLabel(`Evet (${veri.evet.size})`).setStyle(ButtonStyle.Success).setEmoji('✅'),
-                new ButtonBuilder().setCustomId('oy_hayir').setLabel(`Hayır (${veri.hayir.size})`).setStyle(ButtonStyle.Danger).setEmoji('❌')
-            );
-
-            await message.edit({ embeds: [guncelEmbed], components: [guncelRow] }).catch(() => {});
         }
     }
 });
