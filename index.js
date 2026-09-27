@@ -8,12 +8,12 @@ process.on('unhandledRejection', error => {
 
 // Render / Replit vb. platformlarda botun 7/24 açık kalması için web sunucu
 const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('MESAJ, DUYURU, VERIFY, OTOROL, SUNUCUBILGI, CEKILIS VE OYLAMA BOTU AKTIF!\n');
+    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('MESAJ, DUYURU, VERIFY, OTOROL, SUNUCUBILGI, CEKILIS, OYLAMA VE KANAL/ROL BOTU AKTIF!\n');
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 [WEB SUNUCU]: Sunucu ${PORT} portunda aktif.`);
 });
 
@@ -31,7 +31,7 @@ const otoRolAyarlari = new Map();
 const cekilisler = new Map();
 const oylamalar = new Map();
 
-// SADECE İSTENEN 7 ADET SLASH KOMUTU
+// SLASH KOMUTLARI LİSTESİ
 const commands = [
     // 1. Botun Mesaj Göndermesi Komutu
     new SlashCommandBuilder()
@@ -46,11 +46,12 @@ const commands = [
         .setDescription('📢 Sunucudaki TÜM ÜYELERE özel mesaj (DM) olarak duyuru gönderir.')
         .addStringOption(opt => opt.setName('mesaj').setDescription('DM ile gönderilecek duyuru metni').setRequired(true)),
 
-    // 3. Doğrulama (Verify) Paneli Kurma Komutu
+    // 3. Doğrulama (Verify) Paneli Kurma Komutu (ALINACAK ROL SEÇENEĞİ EKLENDİ)
     new SlashCommandBuilder()
         .setName('verify-kur')
         .setDescription('✅ Butonlu kullanıcı doğrulama panelini kurar.')
-        .addRoleOption(opt => opt.setName('rol').setDescription('Doğrulanan üyelere verilecek rol').setRequired(true)),
+        .addRoleOption(opt => opt.setName('verilecek-rol').setDescription('Doğrulanan üyelere verilecek rol').setRequired(true))
+        .addRoleOption(opt => opt.setName('alinacak-rol').setDescription('Doğrulanan üyeden ALINACAK rol (örn: Kayıtsız/Unverified)').setRequired(false)),
 
     // 4. Oto Rol Ayarlama Komutu
     new SlashCommandBuilder()
@@ -75,7 +76,26 @@ const commands = [
         .setName('oylama')
         .setDescription('📊 Butonlu canlı oylama başlatır.')
         .addStringOption(opt => opt.setName('soru').setDescription('Oylama sorusu/konusu').setRequired(true))
-        .addIntegerOption(opt => opt.setName('sure').setDescription('Oylama süresi (Dakika)').setRequired(true))
+        .addIntegerOption(opt => opt.setName('sure').setDescription('Oylama süresi (Dakika)').setRequired(true)),
+
+    // 🔒 8. Kanal Kilitleme Komutu
+    new SlashCommandBuilder()
+        .setName('kanal-kilitle')
+        .setDescription('🔒 Bulunduğunuz kanalı üyelerin mesaj yazmasına kapatır.')
+        .addChannelOption(opt => opt.setName('kanal').setDescription('Kilitlenecek kanal (Opsiyonel)').setRequired(false)),
+
+    // 🔓 9. Kanal Kilidi Açma Komutu
+    new SlashCommandBuilder()
+        .setName('kanal-ac')
+        .setDescription('🔓 Kilitli olan kanalın kilidini açarak tekrar mesaja açar.')
+        .addChannelOption(opt => opt.setName('kanal').setDescription('Açılacak kanal (Opsiyonel)').setRequired(false)),
+
+    // 🎭 10. Rol Verme Komutu
+    new SlashCommandBuilder()
+        .setName('rol-ver')
+        .setDescription('🎭 Belirtilen kullanıcıya istediğiniz rolü verir.')
+        .addUserOption(opt => opt.setName('kullanici').setDescription('Rol verilecek üye').setRequired(true))
+        .addRoleOption(opt => opt.setName('rol').setDescription('Verilecek rol').setRequired(true))
 ].map(command => command.toJSON());
 
 client.once('clientReady', async () => {
@@ -108,7 +128,7 @@ client.on('messageCreate', async message => {
 
     const icerik = message.content.toLowerCase().trim();
 
-    if (icerik === 'sa' || icerik === 's.a' || icerik === 's.a.' || icerik === 'selamun aleykum' || icerik === 'selamün aleyküm') {
+    if (['sa', 's.a', 's.a.', 'selamun aleykum', 'selamün aleyküm'].includes(icerik)) {
         await message.reply('Aleykum Selam, Hoş Geldin! 👋');
     }
 });
@@ -179,7 +199,12 @@ client.on('interactionCreate', async interaction => {
 
         // ✅ 3. DOĞRULAMA (VERIFY) PANELİ KURMA (/verify-kur)
         else if (commandName === 'verify-kur') {
-            const verilecekRol = interaction.options.getRole('rol');
+            const verilecekRol = interaction.options.getRole('verilecek-rol');
+            const alinacakRol = interaction.options.getRole('alinacak-rol');
+
+            const customId = alinacakRol 
+                ? `verify_button_${verilecekRol.id}_${alinacakRol.id}`
+                : `verify_button_${verilecekRol.id}`;
 
             const embed = new EmbedBuilder()
                 .setColor('#2ECC71')
@@ -190,14 +215,18 @@ client.on('interactionCreate', async interaction => {
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
-                    .setCustomId(`verify_button_${verilecekRol.id}`)
+                    .setCustomId(customId)
                     .setLabel('Doğrula')
                     .setStyle(ButtonStyle.Success)
                     .setEmoji('✅')
             );
 
             await interaction.channel.send({ embeds: [embed], components: [row] });
-            await interaction.reply({ content: `✅ **Doğrulama paneli kuruldu!** Tıklayan üyelere <@&${verilecekRol.id}> rolü verilecek.`, flags: MessageFlags.Ephemeral });
+
+            let replyMsg = `✅ **Doğrulama paneli kuruldu!**\n➕ **Verilecek Rol:** <@&${verilecekRol.id}>`;
+            if (alinacakRol) replyMsg += `\n➖ **Alınacak Rol:** <@&${alinacakRol.id}>`;
+
+            await interaction.reply({ content: replyMsg, flags: MessageFlags.Ephemeral });
         }
 
         // 🤖 4. OTO ROL AYARLAMA (/otorol-ayarla)
@@ -292,7 +321,7 @@ client.on('interactionCreate', async interaction => {
             const embed = new EmbedBuilder()
                 .setColor('#3498DB')
                 .setTitle('📊 **CANLI OYLAMA**')
-                .setDescription(`📌 **Soru:** ${soru}\n⏰ **Bitiş:** <t:${bitisZamani}:R>\n\n✅ **Evet:** \`0\`\n❌ **Hayır:** \`0\``)
+                .setDescription(`📌 **Soru:** ${soru}\n⏰ **Bitiş:** <t:${bitisZamani}:R>\n\n✅ **Evet:** \`0\`\n❌ **Hayır:** \`${0}\``)
                 .setFooter({ text: 'Oyunuzu kullanmak için aşağıdaki butonlara basın!' })
                 .setTimestamp();
 
@@ -324,30 +353,88 @@ client.on('interactionCreate', async interaction => {
                 oylamalar.delete(mesaj.id);
             }, sureDakika * 60 * 1000);
         }
+
+        // 🔒 8. KANAL KİLİTLEME (/kanal-kilitle)
+        else if (commandName === 'kanal-kilitle') {
+            const hedefKanal = interaction.options.getChannel('kanal') || interaction.channel;
+            try {
+                await hedefKanal.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: false });
+                await interaction.reply({ content: `🔒 ${hedefKanal} kanalı başarıyla kilitlendi. Artık üyeler mesaj yazamaz.` });
+            } catch (err) {
+                await interaction.reply({ content: '❌ **HATA:** Kanal kilitlenemedi. Botun `Kanalları Yönet` yetkisini kontrol edin.', flags: MessageFlags.Ephemeral });
+            }
+        }
+
+        // 🔓 9. KANAL KİLİDİ AÇMA (/kanal-ac)
+        else if (commandName === 'kanal-ac') {
+            const hedefKanal = interaction.options.getChannel('kanal') || interaction.channel;
+            try {
+                await hedefKanal.permissionOverwrites.edit(interaction.guild.roles.everyone, { SendMessages: null });
+                await interaction.reply({ content: `🔓 ${hedefKanal} kanalının kilidi açıldı. Üyeler tekrar mesaj yazabilir.` });
+            } catch (err) {
+                await interaction.reply({ content: '❌ **HATA:** Kanal açılamadı. Botun `Kanalları Yönet` yetkisini kontrol edin.', flags: MessageFlags.Ephemeral });
+            }
+        }
+
+        // 🎭 10. ROL VERME (/rol-ver)
+        else if (commandName === 'rol-ver') {
+            const hedefUye = interaction.options.getUser('kullanici');
+            const verilecekRol = interaction.options.getRole('rol');
+            const member = await interaction.guild.members.fetch(hedefUye.id).catch(() => null);
+
+            if (!member) {
+                return interaction.reply({ content: '❌ Kullanıcı sunucuda bulunamadı.', flags: MessageFlags.Ephemeral });
+            }
+
+            if (member.roles.cache.has(verilecekRol.id)) {
+                return interaction.reply({ content: 'ℹ️ Bu kullanıcı zaten bu role sahip.', flags: MessageFlags.Ephemeral });
+            }
+
+            try {
+                await member.roles.add(verilecekRol);
+                await interaction.reply({ content: `✅ <@${member.id}> kullanıcısına <@&${verilecekRol.id}> rolü başarıyla verildi.` });
+            } catch (err) {
+                await interaction.reply({ content: '❌ **HATA:** Rol verilemedi. Botun rolünün, verilen rolden **üstte** olduğundan ve `Rolleri Yönet` yetkisi olduğundan emin olun.', flags: MessageFlags.Ephemeral });
+            }
+        }
     }
 
     // --- BUTON ETKİLEŞİMLERİ ---
     else if (interaction.isButton()) {
         const { customId, guild, member, user, message } = interaction;
 
-        // ✅ VERIFY BUTONU
+        // ✅ VERIFY BUTONU (ROL VER + ESKİ ROLÜ AL)
         if (customId.startsWith('verify_button_')) {
-            const rolId = customId.split('verify_button_')[1];
-            const rol = guild.roles.cache.get(rolId);
+            const parts = customId.split('_');
+            const verilecekRolId = parts[2];
+            const alinacakRolId = parts[3] || null;
 
-            if (!rol) {
+            const verilecekRol = guild.roles.cache.get(verilecekRolId);
+            const alinacakRol = alinacakRolId ? guild.roles.cache.get(alinacakRolId) : null;
+
+            if (!verilecekRol) {
                 return interaction.reply({ content: '❌ **HATA:** Atanacak rol bulunamadı.', flags: MessageFlags.Ephemeral });
             }
 
-            if (member.roles.cache.has(rol.id)) {
+            if (member.roles.cache.has(verilecekRol.id)) {
                 return interaction.reply({ content: 'ℹ️ Zaten bu role sahipsiniz.', flags: MessageFlags.Ephemeral });
             }
 
             try {
-                await member.roles.add(rol);
-                await interaction.reply({ content: `🎉 **Başarıyla Doğrulandınız!** <@&${rol.id}> rolü tanımlandı.`, flags: MessageFlags.Ephemeral });
+                // 1. Yeni rolü ver
+                await member.roles.add(verilecekRol);
+
+                // 2. Eğer varsa doğrulanmamış / kayıtsız rolünü al
+                if (alinacakRol && member.roles.cache.has(alinacakRol.id)) {
+                    await member.roles.remove(alinacakRol);
+                }
+
+                await interaction.reply({ 
+                    content: `🎉 **Başarıyla Doğrulandınız!**\n✅ <@&${verilecekRol.id}> rolü tanımlandı.` + (alinacakRol ? `\n🗑️ <@&${alinacakRol.id}> rolü üzerinizden alındı.` : ''), 
+                    flags: MessageFlags.Ephemeral 
+                });
             } catch (err) {
-                await interaction.reply({ content: '❌ **HATA:** Rol verilemedi. Bot rolünün yetkisini kontrol edin.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: '❌ **HATA:** Rol işlemleri gerçekleştirilemedi. Botun roller üzerindeki yetkilerini ve rol sıralamasını kontrol edin.', flags: MessageFlags.Ephemeral });
             }
         }
 
