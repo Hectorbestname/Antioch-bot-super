@@ -6,10 +6,10 @@ process.on('unhandledRejection', error => {
     console.error('⚠️ [HATA ENGELLENDİ]:', error);
 });
 
-// Render / Replit vb. platformlarda botun 7/24 kalması için web sunucu
+// Render / Replit vb. platformlarda botun 7/24 kalması için web sunucu (Düzeltildi)
 const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('BOT AKTIF!\n');
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
 });
 
 const PORT = process.env.PORT || 3000;
@@ -347,7 +347,7 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // 🎫 TICKET OLUŞTURMA BUTONLARI (GÜNCELLENDİ)
+        // 🎫 TICKET OLUŞTURMA BUTONLARI
         else if (customId.startsWith('ticket_') && customId !== 'ticket_kapat') {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
 
