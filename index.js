@@ -6,7 +6,7 @@ process.on('unhandledRejection', error => {
     console.error('⚠️ [HATA ENGELLENDİ]:', error);
 });
 
-// Render / Replit vb. platformlarda botun 7/24 açık kalması için web sunucu
+// Render / Replit vb. platformlarda botun 7/24 kalması için web sunucu
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('BOT AKTIF!\n');
@@ -30,9 +30,8 @@ const client = new Client({
 const otoRolAyarlari = new Map();
 const ticketYetkiliRolleri = new Map();
 
-// SLASH KOMUTLARI LİSTESİ (SADECE YÖNETİCİYE ÖZEL İZİNLER EKLENDİ)
+// SLASH KOMUTLARI LİSTESİ
 const commands = [
-    // 1. Botun Mesaj Göndermesi Komutu
     new SlashCommandBuilder()
         .setName('yaz')
         .setDescription('🤖 Belirttiğiniz mesajı bot adıyla kanala gönderir.')
@@ -40,48 +39,41 @@ const commands = [
         .addStringOption(opt => opt.setName('mesaj').setDescription('Gönderilecek mesaj metni').setRequired(true))
         .addChannelOption(opt => opt.setName('kanal').setDescription('Mesajın atılacağı kanal (Opsiyonel)').setRequired(false)),
 
-    // 2. DM Duyuru Komutu
     new SlashCommandBuilder()
         .setName('duyuru-dm')
         .setDescription('📢 Sunucudaki TÜM ÜYELERE özel mesaj (DM) olarak duyuru gönderir.')
         .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addStringOption(opt => opt.setName('mesaj').setDescription('DM ile gönderilecek duyuru metni').setRequired(true)),
 
-    // 3. Doğrulama (Verify) Paneli Kurma Komutu
     new SlashCommandBuilder()
         .setName('verify-kur')
         .setDescription('✅ Butonlu kullanıcı doğrulama panelini kurar.')
         .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addRoleOption(opt => opt.setName('verilecek-rol').setDescription('Doğrulanan üyelere verilecek rol').setRequired(true))
-        .addRoleOption(opt => opt.setName('alinacak-rol').setDescription('Doğrulanan üyeden ALINACAK rol (örn: Kayıtsız/Unverified)').setRequired(false)),
+        .addRoleOption(opt => opt.setName('alinacak-rol').setDescription('Doğrulanan üyeden ALINACAK rol').setRequired(false)),
 
-    // 4. Oto Rol Ayarlama Komutu
     new SlashCommandBuilder()
         .setName('otorol-ayarla')
         .setDescription('🤖 Sunucuya yeni katılan üyelere otomatik verilecek rolü ayarlar.')
         .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addRoleOption(opt => opt.setName('rol').setDescription('Otomatik verilecek rol').setRequired(true)),
 
-    // 5. Sunucu Bilgi Komutu (HERKES KULLANABİLİR - KISITLAMA YOK)
     new SlashCommandBuilder()
         .setName('sunucubilgi')
         .setDescription('🏰 Sunucu hakkındaki istatistikleri ve detaylı bilgileri gösterir.'),
 
-    // 🔒 6. Kanal Kilitleme Komutu
     new SlashCommandBuilder()
         .setName('kanal-kilitle')
         .setDescription('🔒 Bulunduğunuz kanalı üyelerin mesaj yazmasına kapatır.')
         .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addChannelOption(opt => opt.setName('kanal').setDescription('Kilitlenecek kanal (Opsiyonel)').setRequired(false)),
 
-    // 🔓 7. Kanal Kilidi Açma Komutu
     new SlashCommandBuilder()
         .setName('kanal-ac')
         .setDescription('🔓 Kilitli olan kanalın kilidini açarak tekrar mesaja açar.')
         .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator)
         .addChannelOption(opt => opt.setName('kanal').setDescription('Açılacak kanal (Opsiyonel)').setRequired(false)),
 
-    // 🎭 8. Rol Verme Komutu
     new SlashCommandBuilder()
         .setName('rol-ver')
         .setDescription('🎭 Belirtilen kullanıcıya istediğiniz rolü verir.')
@@ -89,7 +81,6 @@ const commands = [
         .addUserOption(opt => opt.setName('kullanici').setDescription('Rol verilecek üye').setRequired(true))
         .addRoleOption(opt => opt.setName('rol').setDescription('Verilecek rol').setRequired(true)),
 
-    // 🎫 9. Figüran / Destek Talebi Paneli Komutu
     new SlashCommandBuilder()
         .setName('figuranticket')
         .setDescription('🎫 Görseldeki gibi butonlu Destek Talebi (Ticket) panelini kurar.')
@@ -124,9 +115,7 @@ client.on('guildMemberAdd', async member => {
 // OTOMATİK SA-AS SİSTEMİ
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
-
     const icerik = message.content.toLowerCase().trim();
-
     if (['sa', 's.a', 's.a.', 'selamun aleykum', 'selamün aleyküm'].includes(icerik)) {
         await message.reply('Aleykum Selam, Hoş Geldin! 👋');
     }
@@ -139,15 +128,13 @@ client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
         const { commandName } = interaction;
 
-        // ⛔ İKİNCİ KONTROL: YÖNETİCİ KONTROLÜ (/sunucubilgi HARİÇ)
         if (commandName !== 'sunucubilgi' && !interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
             return interaction.reply({ 
-                content: '❌ **YETKİSİZ ERİŞİM:** Bu komutu kullanmak için `Yönetici` yetkisine sahip olmalısınız!', 
+                content: '❌ **YETKİSİZ ERİŞİM:** Bu komutu kullanmak için `Yönetici` yetkisine sahip olmalısın!', 
                 flags: MessageFlags.Ephemeral 
             });
         }
 
-        // 💬 1. BOTUN MESAJ GÖNDERMESİ (/yaz)
         if (commandName === 'yaz') {
             const mesaj = interaction.options.getString('mesaj');
             const hedefKanal = interaction.options.getChannel('kanal') || interaction.channel;
@@ -160,7 +147,6 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // 📩 2. HERKESE ÖZEL MESAJ (DM) ATMA (/duyuru-dm)
         else if (commandName === 'duyuru-dm') {
             const duyuruMetni = interaction.options.getString('mesaj');
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -200,7 +186,6 @@ client.on('interactionCreate', async interaction => {
             });
         }
 
-        // ✅ 3. DOĞRULAMA (VERIFY) PANELİ KURMA (/verify-kur)
         else if (commandName === 'verify-kur') {
             const verilecekRol = interaction.options.getRole('verilecek-rol');
             const alinacakRol = interaction.options.getRole('alinacak-rol');
@@ -232,14 +217,12 @@ client.on('interactionCreate', async interaction => {
             await interaction.reply({ content: replyMsg, flags: MessageFlags.Ephemeral });
         }
 
-        // 🤖 4. OTO ROL AYARLAMA (/otorol-ayarla)
         else if (commandName === 'otorol-ayarla') {
             const rol = interaction.options.getRole('rol');
             otoRolAyarlari.set(interaction.guild.id, rol.id);
             await interaction.reply({ content: `✅ **Oto Rol Ayarlandı:** Yeni katılan kişilere <@&${rol.id}> rolü verilecek.`, flags: MessageFlags.Ephemeral });
         }
 
-        // 🏰 5. SUNUCU BİLGİ (/sunucubilgi - HERKESE AÇIK)
         else if (commandName === 'sunucubilgi') {
             const guild = interaction.guild;
             const embed = new EmbedBuilder()
@@ -258,7 +241,6 @@ client.on('interactionCreate', async interaction => {
             await interaction.reply({ embeds: [embed] });
         }
 
-        // 🔒 6. KANAL KİLİTLEME (/kanal-kilitle)
         else if (commandName === 'kanal-kilitle') {
             const hedefKanal = interaction.options.getChannel('kanal') || interaction.channel;
             try {
@@ -269,7 +251,6 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // 🔓 7. KANAL KİLİDİ AÇMA (/kanal-ac)
         else if (commandName === 'kanal-ac') {
             const hedefKanal = interaction.options.getChannel('kanal') || interaction.channel;
             try {
@@ -280,7 +261,6 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // 🎭 8. ROL VERME (/rol-ver)
         else if (commandName === 'rol-ver') {
             const hedefUye = interaction.options.getUser('kullanici');
             const verilecekRol = interaction.options.getRole('rol');
@@ -298,11 +278,10 @@ client.on('interactionCreate', async interaction => {
                 await member.roles.add(verilecekRol);
                 await interaction.reply({ content: `✅ <@${member.id}> kullanıcısına <@&${verilecekRol.id}> rolü başarıyla verildi.` });
             } catch (err) {
-                await interaction.reply({ content: '❌ **HATA:** Rol verilemedi. Botun rolünün, verilen rolden **üstte** olduğundan ve `Rolleri Yönet` yetkisi olduğundan emin olun.', flags: MessageFlags.Ephemeral });
+                await interaction.reply({ content: '❌ **HATA:** Rol verilemedi. Botun rolünün üstte olduğundan ve yetkiden emin olun.', flags: MessageFlags.Ephemeral });
             }
         }
 
-        // 🎫 9. FİGÜRAN / DESTEK TALEBİ PANELİ (/figuranticket)
         else if (commandName === 'figuranticket') {
             const yetkiliRol = interaction.options.getRole('yetkili-rol');
             if (yetkiliRol) {
@@ -337,7 +316,6 @@ client.on('interactionCreate', async interaction => {
     else if (interaction.isButton()) {
         const { customId, guild, member, user } = interaction;
 
-        // ✅ VERIFY BUTONU
         if (customId.startsWith('verify_button_')) {
             const parts = customId.split('_');
             const verilecekRolId = parts[2];
@@ -369,10 +347,11 @@ client.on('interactionCreate', async interaction => {
             }
         }
 
-        // 🎫 TICKET OLUŞTURMA BUTONLARI (HER KULLANICI TIKLAYABİLİR)
+        // 🎫 TICKET OLUŞTURMA BUTONLARI (GÜNCELLENDİ)
         else if (customId.startsWith('ticket_') && customId !== 'ticket_kapat') {
-            const kuralTipi = customId.replace('ticket_', '');
-            
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
+
+            const kuralTipi = customId.replace('ticket_', ''); 
             const tipIsimleri = {
                 'figuran': 'figuran',
                 'sikayet': 'sikayet',
@@ -381,15 +360,13 @@ client.on('interactionCreate', async interaction => {
             };
 
             const secilenTip = tipIsimleri[kuralTipi] ? tipIsimleri[kuralTipi] : 'destek';
-            const temizKullaniciAdi = user.username.toLowerCase().replace(/[^a-z0-9]/g, '');
-            const kanalAdi = secilenTip + '-' + temizKullaniciAdi;
+            const temizKullaniciAdi = user.username.toLowerCase().replace(/[^a-z0-9]/g, '') || 'uye';
+            const kanalAdi = `${secilenTip}-${temizKullaniciAdi}`;
 
             const varKanal = guild.channels.cache.find(c => c.name === kanalAdi);
             if (varKanal) {
-                return interaction.reply({ content: `❌ Zaten açık bir destek talebiniz bulunuyor: ${varKanal}`, flags: MessageFlags.Ephemeral });
+                return interaction.editReply({ content: `❌ Zaten açık bir destek talebiniz bulunuyor: ${varKanal}` });
             }
-
-            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
             const permissionOverwrites = [
                 {
@@ -424,7 +401,7 @@ client.on('interactionCreate', async interaction => {
                 const ticketEmbed = new EmbedBuilder()
                     .setColor('#2ECC71')
                     .setTitle('🎫 **DESTEK TALEBİ OLUŞTURULDU**')
-                    .setDescription(`Merhaba <@${user.id}>,\n\n**Talep Türü:** \`${secilenTip.toUpperCase()}\`\n\nYetkililerimiz en kısa sürede seninle ilgilenecektir. Lütfen sorununuzu veya başvurunuzu detaylıca açıklayınız.\n\nTalebi kapatmak için aşağıdaki **"🔒 Talebi Kapat"** butonuna basabilirsiniz.`)
+                    .setDescription(`Merhaba <@${user.id}>,\n\n**Talep Türü:** \`${secilenTip.toUpperCase()}\`\n\nYetkililerimiz en kısa sürede seninle ilgilenecektir.\nTalebi kapatmak için aşağıdaki **"🔒 Talebi Kapat"** butonuna basabilirsin.`)
                     .setTimestamp();
 
                 const ticketRow = new ActionRowBuilder().addComponents(
@@ -435,16 +412,19 @@ client.on('interactionCreate', async interaction => {
                         .setEmoji('🔒')
                 );
 
-                await ticketKanal.send({ content: `<@${user.id}>` + (yetkiliRolId ? ` <@&${yetkiliRolId}>` : ''), embeds: [ticketEmbed], components: [ticketRow] });
+                await ticketKanal.send({ 
+                    content: `<@${user.id}>` + (yetkiliRolId ? ` <@&${yetkiliRolId}>` : ''), 
+                    embeds: [ticketEmbed], 
+                    components: [ticketRow] 
+                });
 
                 await interaction.editReply({ content: `✅ **Destek talebiniz oluşturuldu:** ${ticketKanal}` });
             } catch (err) {
-                console.error(err);
-                await interaction.editReply({ content: '❌ **HATA:** Destek kanalı oluşturulamadı. Botun `Kanalları Yönet` yetkisi olduğundan emin olun.' });
+                console.error('Ticket oluşturma hatası:', err);
+                await interaction.editReply({ content: '❌ **HATA:** Destek kanalı oluşturulamadı. Botun `Kanalları Yönet` yetkisi olduğundan emin ol.' });
             }
         }
 
-        // 🔒 TICKET KAPATMA BUTONU
         else if (customId === 'ticket_kapat') {
             await interaction.reply({ content: '🔒 **Bu destek talebi 5 saniye içinde kapatılıp silinecektir...**' });
             setTimeout(async () => {
