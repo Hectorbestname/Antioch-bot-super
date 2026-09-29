@@ -90,7 +90,7 @@ const commands = [
 
 client.once('clientReady', async () => {
     console.log(`🛡️ [SİSTEM AKTİF]: ${client.user.tag} göreve başladı!`);
-    client.user.setActivity('🏰 Sunucu Yönetimi & Duyuru', { type: ActivityType.Watching });
+    client.user.setActivity('Just Youtube', { type: ActivityType.Watching });
     
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
     try { 
